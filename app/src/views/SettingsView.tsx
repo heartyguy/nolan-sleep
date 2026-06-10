@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { t, type Lang } from '../i18n'
 import { eventStore, settingsStore, useEvents, useSettings } from '../store/store'
 import type { Settings } from '../types'
 
@@ -14,6 +15,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export default function SettingsView() {
   const settings = useSettings()
   const events = useEvents()
+  const lang = settings.lang
   const upd = (patch: Partial<Settings>) => settingsStore.update(patch)
 
   const num = (v: string, fallback: number) => {
@@ -27,8 +29,8 @@ export default function SettingsView() {
   const [family, setFamily] = useState(settings.familyCode)
   const [syncStatus, setSyncStatus] = useState<string>(eventStore.sync ? eventStore.sync.status : 'off')
   useEffect(() => {
-    const t = setInterval(() => setSyncStatus(eventStore.sync ? eventStore.sync.status : 'off'), 1500)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setSyncStatus(eventStore.sync ? eventStore.sync.status : 'off'), 1500)
+    return () => clearInterval(timer)
   }, [])
 
   const fileRef = useRef<HTMLInputElement>(null)
@@ -51,20 +53,36 @@ export default function SettingsView() {
       const list = Array.isArray(parsed) ? parsed : parsed.events
       if (!Array.isArray(list)) throw new Error('no events array')
       const added = eventStore.importBackup(list)
-      alert(`Imported ${added} new event${added === 1 ? '' : 's'}.`)
+      alert(t(lang, 'importedN', { n: added }))
     } catch (e) {
-      alert('Could not read that backup file: ' + (e instanceof Error ? e.message : String(e)))
+      alert(t(lang, 'importFailed', { err: e instanceof Error ? e.message : String(e) }))
     }
   }
 
   return (
     <div className="settings">
       <div className="card">
-        <div className="card-title">Schedule (Phase 1)</div>
-        <Row label="Wake him by">
+        <Row label={t(lang, 'langLabel')}>
+          <div className="actors">
+            {(['en', 'zh'] as Lang[]).map((l) => (
+              <button
+                key={l}
+                className={'chip' + (lang === l ? ' on' : '')}
+                onClick={() => upd({ lang: l })}
+              >
+                {l === 'en' ? 'English' : '中文'}
+              </button>
+            ))}
+          </div>
+        </Row>
+      </div>
+
+      <div className="card">
+        <div className="card-title">{t(lang, 'secSchedule')}</div>
+        <Row label={t(lang, 'setWakeBy')}>
           <input type="time" value={settings.wakeBy} onChange={(e) => upd({ wakeBy: e.target.value })} />
         </Row>
-        <Row label="Awake window → nap 1 (min)">
+        <Row label={t(lang, 'setWin1')}>
           <input
             type="number"
             value={settings.awakeWindowsMin[0]}
@@ -75,7 +93,7 @@ export default function SettingsView() {
             }}
           />
         </Row>
-        <Row label="Awake window → later sleeps (min)">
+        <Row label={t(lang, 'setWinLater')}>
           <input
             type="number"
             value={settings.awakeWindowsMin[1]}
@@ -86,14 +104,14 @@ export default function SettingsView() {
             }}
           />
         </Row>
-        <Row label="Feed window (min)">
+        <Row label={t(lang, 'setFeedWin')}>
           <input
             type="number"
             value={settings.feedIntervalMin}
             onChange={(e) => upd({ feedIntervalMin: num(e.target.value, settings.feedIntervalMin) })}
           />
         </Row>
-        <Row label="Full feed (oz)">
+        <Row label={t(lang, 'setFullFeed')}>
           <input
             type="number"
             step="0.5"
@@ -101,38 +119,38 @@ export default function SettingsView() {
             onChange={(e) => upd({ fullFeedOz: num(e.target.value, settings.fullFeedOz) })}
           />
         </Row>
-        <Row label="Milk target / 24h (oz)">
+        <Row label={t(lang, 'setMilkTarget')}>
           <input
             type="number"
             value={settings.milkTargetOz}
             onChange={(e) => upd({ milkTargetOz: num(e.target.value, settings.milkTargetOz) })}
           />
         </Row>
-        <Row label="Nap target (min)">
+        <Row label={t(lang, 'setNapTarget')}>
           <input
             type="number"
             value={settings.napTargetMin}
             onChange={(e) => upd({ napTargetMin: num(e.target.value, settings.napTargetMin) })}
           />
         </Row>
-        <Row label="Wake from last nap by">
+        <Row label={t(lang, 'setNap3By')}>
           <input type="time" value={settings.nap3WakeBy} onChange={(e) => upd({ nap3WakeBy: e.target.value })} />
         </Row>
-        <Row label="Bedtime earliest">
+        <Row label={t(lang, 'setBedEarliest')}>
           <input
             type="time"
             value={settings.bedtimeEarliest}
             onChange={(e) => upd({ bedtimeEarliest: e.target.value })}
           />
         </Row>
-        <Row label="Bedtime latest">
+        <Row label={t(lang, 'setBedLatest')}>
           <input
             type="time"
             value={settings.bedtimeLatest}
             onChange={(e) => upd({ bedtimeLatest: e.target.value })}
           />
         </Row>
-        <div className="card-title sub">Planned night feeds</div>
+        <div className="card-title sub">{t(lang, 'secNightFeeds')}</div>
         {settings.nightFeedPlan.map((p, i) => (
           <div className="night-feed-row" key={i}>
             <input
@@ -166,14 +184,14 @@ export default function SettingsView() {
           className="btn ghost"
           onClick={() => upd({ nightFeedPlan: [...settings.nightFeedPlan, { time: '23:00', oz: 4 }] })}
         >
-          + Add night feed
+          {t(lang, 'addNightFeed')}
         </button>
       </div>
 
       <div className="card">
-        <div className="card-title">Caregivers</div>
+        <div className="card-title">{t(lang, 'secCaregivers')}</div>
         {settings.actors.map((a, i) => (
-          <Row key={i} label={`Caregiver ${i + 1}`}>
+          <Row key={i} label={t(lang, 'caregiverN', { n: i + 1 })}>
             <input
               type="text"
               value={a}
@@ -190,37 +208,39 @@ export default function SettingsView() {
 
       <div className="card">
         <div className="card-title">
-          Family sync <span className={'dot ' + syncStatus} /> <small>{syncStatus}</small>
+          {t(lang, 'secSync')} <span className={'dot ' + syncStatus} /> <small>{syncStatus}</small>
         </div>
-        <p className="hint">
-          One person creates a free Supabase project, runs <code>supabase.sql</code> (in the app folder) in its
-          SQL editor, then everyone enters the same URL + anon key + family code here.
-        </p>
-        <Row label="Supabase URL">
-          <input type="text" value={url} placeholder="https://xxxx.supabase.co" onChange={(e) => setUrl(e.target.value)} />
+        <p className="hint">{t(lang, 'syncHint')}</p>
+        <Row label={t(lang, 'setSupaUrl')}>
+          <input
+            type="text"
+            value={url}
+            placeholder="https://xxxx.supabase.co"
+            onChange={(e) => setUrl(e.target.value)}
+          />
         </Row>
-        <Row label="Anon key">
+        <Row label={t(lang, 'setAnonKey')}>
           <input type="text" value={key} onChange={(e) => setKey(e.target.value)} />
         </Row>
-        <Row label="Family code">
+        <Row label={t(lang, 'setFamily')}>
           <input type="text" value={family} onChange={(e) => setFamily(e.target.value)} />
         </Row>
         <button
           className="btn primary"
           onClick={() => upd({ supabaseUrl: url.trim(), supabaseAnonKey: key.trim(), familyCode: family.trim() })}
         >
-          Save & connect
+          {t(lang, 'saveConnect')}
         </button>
       </div>
 
       <div className="card">
-        <div className="card-title">Data</div>
+        <div className="card-title">{t(lang, 'secData')}</div>
         <div className="row-2">
           <button className="btn" onClick={downloadBackup}>
-            ⬇️ Backup (JSON)
+            {t(lang, 'backupBtn')}
           </button>
           <button className="btn" onClick={() => fileRef.current?.click()}>
-            ⬆️ Restore backup
+            {t(lang, 'restoreBtn')}
           </button>
         </div>
         <input
@@ -237,13 +257,13 @@ export default function SettingsView() {
         <button
           className="btn danger"
           onClick={() => {
-            if (!confirm('Erase all data on this device? (Synced data on the server is kept.)')) return
+            if (!confirm(t(lang, 'confirmErase'))) return
             localStorage.removeItem('nolan.events.v1')
             localStorage.removeItem('nolan.outbox.v1')
             location.reload()
           }}
         >
-          Erase local data
+          {t(lang, 'eraseBtn')}
         </button>
       </div>
     </div>

@@ -346,6 +346,12 @@ body {
   line-height: 1.5;
 }
 
+/* history */
+.history { display: flex; flex-direction: column; gap: 12px; }
+.stat { color: var(--text); font-variant-numeric: tabular-nums; }
+.stat.good { color: var(--good); }
+.stat.off { color: var(--warn); }
+
 /* settings */
 .settings { display: flex; flex-direction: column; gap: 12px; }
 .set-row {

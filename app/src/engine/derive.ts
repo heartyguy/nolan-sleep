@@ -44,20 +44,37 @@ export interface Plan {
   patFrom?: Date
   expect?: string
   feedAt: Date
-  feedOz: string
+  feedOzText: string // e.g. '4' or '2–3'
   feedCollision: boolean
-  feedNote?: string
+  feedNoteKey?: 'topUp' | 'topUpSmall' | 'pulledEarly'
 }
 
 export interface NightInfo {
   nextFeedAt?: Date
-  nextFeedOz?: string
-  guidance: string
+  nextFeedOzText?: string
+  guidanceKey: 'nightEvening' | 'nightLate' | 'night3am' | 'nightEarlyMorning'
+  guidanceParams?: Record<string, string | number>
 }
+
+export type AlertKey =
+  | 'pastWakeBy'
+  | 'protectBedtime'
+  | 'veryLongNap'
+  | 'settle30'
+  | 'settle20'
+  | 'earlyWake'
+  | 'tapStartDay'
+  | 'pastGoal'
+  | 'startRoutineNap'
+  | 'startRoutineBedtime'
+  | 'routineSoonNap'
+  | 'routineSoonBedtime'
+  | 'feedWindowOpen'
 
 export interface Alert {
   level: 'now' | 'warn' | 'info'
-  text: string
+  key: AlertKey
+  params?: Record<string, string | number>
 }
 
 export interface Snapshot {
@@ -239,15 +256,15 @@ export function buildPlan(
   const nextFeedDue = lastFeed ? addMin(new Date(lastFeed.ts), s.feedIntervalMin) : now
   let feedAt = nextFeedDue
   let feedCollision = false
-  let feedOz = `${s.fullFeedOz} oz`
-  let feedNote: string | undefined
+  let feedOzText = String(s.fullFeedOz)
+  let feedNoteKey: Plan['feedNoteKey']
 
   if (isBedtime) {
     feedAt = addMin(sleepGoal, -s.topUpLeadMin)
-    feedNote = 'top-up before bed'
+    feedNoteKey = 'topUp'
     if (lastFeed && diffMin(feedAt, new Date(lastFeed.ts)) < s.feedIntervalMin - 60) {
-      feedOz = '2–3 oz'
-      feedNote = 'top-up — not a full window, keep it small'
+      feedOzText = '2–3'
+      feedNoteKey = 'topUpSmall'
     }
   } else {
     const windowStart = addMin(sleepGoal, -s.topUpLeadMin)
@@ -255,10 +272,10 @@ export function buildPlan(
     if (nextFeedDue >= windowStart && nextFeedDue <= windowEnd) {
       feedAt = windowStart
       feedCollision = true
-      feedNote = 'pulled earlier so the feed clears the nap'
+      feedNoteKey = 'pulledEarly'
     }
   }
-  return { isBedtime, napNumber, sleepGoal, routineAt, patFrom, expect, feedAt, feedOz, feedCollision, feedNote }
+  return { isBedtime, napNumber, sleepGoal, routineAt, patFrom, expect, feedAt, feedOzText, feedCollision, feedNoteKey }
 }
 
 export function buildNightInfo(dayKey: string, s: Settings, now: Date): NightInfo {
@@ -267,13 +284,16 @@ export function buildNightInfo(dayKey: string, s: Settings, now: Date): NightInf
     .sort((a, b) => a.at.getTime() - b.at.getTime())
   const next = plans.find((p) => diffMin(p.at, now) > -45)
   const h = now.getHours()
-  let guidance: string
-  if (h >= 18 && h < 22) guidance = 'Wakes before ~10:30 pm: settle without feeding — pat like at bedtime.'
-  else if (h >= 22 || h < 2) guidance = 'Around 11 pm: feed 3–4 oz, gentle shoulder burp, then back down.'
-  else if (h >= 2 && h < s.dayCutoffHour) guidance = 'Around 3 am: feed 3–4 oz. Other wakes: pat back to sleep.'
-  else
-    guidance = `Early-morning wake: try settling first — if you must feed, cap it at ${s.earlyFeedCapOz} oz so he's hungry at day start.`
-  return { nextFeedAt: next?.at, nextFeedOz: next ? `${next.oz} oz` : undefined, guidance }
+  let guidanceKey: NightInfo['guidanceKey']
+  let guidanceParams: Record<string, string | number> | undefined
+  if (h >= 18 && h < 22) guidanceKey = 'nightEvening'
+  else if (h >= 22 || h < 2) guidanceKey = 'nightLate'
+  else if (h >= 2 && h < s.dayCutoffHour) guidanceKey = 'night3am'
+  else {
+    guidanceKey = 'nightEarlyMorning'
+    guidanceParams = { capOz: s.earlyFeedCapOz }
+  }
+  return { nextFeedAt: next?.at, nextFeedOzText: next ? String(next.oz) : undefined, guidanceKey, guidanceParams }
 }
 
 export function buildAlerts(
@@ -290,48 +310,37 @@ export function buildAlerts(
   if (state.mode === 'sleeping') {
     if (state.isNight) {
       const wakeBy = atTime(todayK, s.wakeBy, s.dayCutoffHour)
-      if (now >= wakeBy && hour < 12)
-        out.push({ level: 'now', text: `Past ${fmtHM(wakeBy)} — wake him up and start the day.` })
+      if (now >= wakeBy && hour < 12) out.push({ level: 'now', key: 'pastWakeBy', params: { time: fmtHM(wakeBy) } })
     } else {
       if (state.session.napIndex === s.napCount && now >= atTime(day.key, s.nap3WakeBy, s.dayCutoffHour))
-        out.push({ level: 'now', text: `Wake him from nap ${s.napCount} — protect bedtime.` })
-      if (state.sinceMin >= s.napMaxMin)
-        out.push({ level: 'warn', text: 'Very long nap — consider waking him (or did a wake-up not get logged?)' })
+        out.push({ level: 'now', key: 'protectBedtime', params: { n: s.napCount } })
+      if (state.sinceMin >= s.napMaxMin) out.push({ level: 'warn', key: 'veryLongNap' })
     }
   } else if (state.mode === 'settling') {
-    if (state.sinceMin >= 30)
-      out.push({
-        level: 'warn',
-        text: 'Still settling after 30 min — a small feed (1–3 oz) to make him drowsy is okay. Not a full feed.',
-      })
-    else if (state.sinceMin >= 20)
-      out.push({ level: 'now', text: '20 min of settling — take a break, leave the room, then try ~10 more min.' })
+    if (state.sinceMin >= 30) out.push({ level: 'warn', key: 'settle30' })
+    else if (state.sinceMin >= 20) out.push({ level: 'now', key: 'settle20' })
   } else {
-    if (!day.morningWakeTs && hour >= s.dayCutoffHour && hour < 7.25)
-      out.push({
-        level: 'info',
-        text: 'Early wake: hold/rock to extend if you can; avoid feeding to get back to sleep. Start the day by 7:15.',
-      })
-    if (!day.morningWakeTs && hour >= 7.25 && hour < 12)
-      out.push({ level: 'warn', text: "Tap ☀️ Start the day so today's totals count from the morning wake-up." })
+    if (!day.morningWakeTs && hour >= s.dayCutoffHour && hour < 7.25) out.push({ level: 'info', key: 'earlyWake' })
+    if (!day.morningWakeTs && hour >= 7.25 && hour < 12) out.push({ level: 'warn', key: 'tapStartDay' })
     if (plan) {
       const toGoal = diffMin(plan.sleepGoal, now)
       const toRoutine = diffMin(plan.routineAt, now)
-      if (toGoal <= -15)
-        out.push({
-          level: 'warn',
-          text: 'Past the asleep goal — get him down when you can. (A bit too awake beats too early.)',
-        })
+      if (toGoal <= -15) out.push({ level: 'warn', key: 'pastGoal' })
       else if (toRoutine <= 0)
         out.push({
           level: 'now',
-          text: `Start the ${plan.isBedtime ? 'bedtime' : 'nap'} routine — asleep goal ${fmtHM(plan.sleepGoal)}.`,
+          key: plan.isBedtime ? 'startRoutineBedtime' : 'startRoutineNap',
+          params: { time: fmtHM(plan.sleepGoal) },
         })
       else if (toRoutine <= 10)
-        out.push({ level: 'info', text: `${plan.isBedtime ? 'Bedtime' : 'Nap'} routine in ${toRoutine} min.` })
+        out.push({
+          level: 'info',
+          key: plan.isBedtime ? 'routineSoonBedtime' : 'routineSoonNap',
+          params: { min: toRoutine },
+        })
       const toFeed = diffMin(plan.feedAt, now)
       if (toFeed <= 0 && toFeed >= -120 && !plan.isBedtime)
-        out.push({ level: 'info', text: `Feed window open — offer ${plan.feedOz}.` })
+        out.push({ level: 'info', key: 'feedWindowOpen', params: { oz: plan.feedOzText } })
     }
   }
   return out

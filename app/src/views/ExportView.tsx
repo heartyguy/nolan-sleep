@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { buildSessions, resolveEvents } from '../engine/derive'
 import { dayKeyOf, todayKey } from '../engine/time'
 import { buildTrainerLog } from '../export/trainerLog'
+import { t } from '../i18n'
 import type { AppEvent, Settings } from '../types'
 
 export default function ExportView({
@@ -47,12 +48,9 @@ export default function ExportView({
         </button>
       </div>
       <button className="btn primary" onClick={copy}>
-        {copied ? '✓ Copied — paste into the Excel' : '📋 Copy for Excel'}
+        {copied ? t(settings.lang, 'copiedBtn') : t(settings.lang, 'copyBtn')}
       </button>
-      <p className="hint">
-        Copies the day as a tab-separated grid. In the trainer's Excel, tap a cell and paste — it fills the
-        columns. Questions you logged as 📝 notes are included.
-      </p>
+      <p className="hint">{t(settings.lang, 'exportHint')}</p>
       <pre className="export-pre">{text}</pre>
     </div>
   )

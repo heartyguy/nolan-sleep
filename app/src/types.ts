@@ -31,6 +31,7 @@ export interface NightFeed {
 export interface Settings {
   actor: string
   actors: string[]
+  lang: 'en' | 'zh'
   dayCutoffHour: number   // events at/after this hour belong to the new day
   wakeBy: string          // wake him by this time each morning
   awakeWindowsMin: number[] // [before nap1, nap2, nap3, bedtime]
@@ -62,6 +63,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   actor: 'Mom',
   actors: ['Mom', 'Grandpa', 'Grandma'],
+  lang: 'en',
   dayCutoffHour: 5,
   wakeBy: '07:15',
   awakeWindowsMin: [135, 150, 150, 150],

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { deriveSnapshot } from './engine/derive'
+import { t } from './i18n'
 import { eventStore, settingsStore, useEvents, useSettings } from './store/store'
 import ExportView from './views/ExportView'
+import HistoryView from './views/HistoryView'
 import SettingsView from './views/SettingsView'
 import TodayView from './views/TodayView'
 
-type Tab = 'today' | 'export' | 'settings'
+type Tab = 'today' | 'history' | 'export' | 'settings'
 
 function ActorPicker() {
   const settings = useSettings()
@@ -27,8 +29,8 @@ function ActorPicker() {
 function SyncDot() {
   const [s, setS] = useState<string>(eventStore.sync ? eventStore.sync.status : 'off')
   useEffect(() => {
-    const t = setInterval(() => setS(eventStore.sync ? eventStore.sync.status : 'off'), 2000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => setS(eventStore.sync ? eventStore.sync.status : 'off'), 2000)
+    return () => clearInterval(timer)
   }, [])
   if (s === 'off') return null
   return <span className={'dot ' + s} title={'sync: ' + s} />
@@ -44,17 +46,18 @@ export default function App() {
   // including immediately when the tab comes back from the background.
   useEffect(() => {
     const tick = () => setNow(new Date())
-    const t = setInterval(tick, 15_000)
+    const timer = setInterval(tick, 15_000)
     document.addEventListener('visibilitychange', tick)
     window.addEventListener('focus', tick)
     return () => {
-      clearInterval(t)
+      clearInterval(timer)
       document.removeEventListener('visibilitychange', tick)
       window.removeEventListener('focus', tick)
     }
   }, [])
 
   const snap = deriveSnapshot(events, settings, now)
+  const lang = settings.lang
 
   return (
     <div className="app">
@@ -65,18 +68,20 @@ export default function App() {
       </header>
       <main className="main">
         {tab === 'today' && <TodayView snap={snap} now={now} />}
+        {tab === 'history' && <HistoryView events={events} settings={settings} now={now} />}
         {tab === 'export' && <ExportView events={events} settings={settings} now={now} />}
         {tab === 'settings' && <SettingsView />}
       </main>
       <nav className="tabbar">
         {(
           [
-            ['today', 'Today'],
-            ['export', 'Trainer log'],
-            ['settings', 'Settings'],
+            ['today', t(lang, 'tabToday')],
+            ['history', t(lang, 'tabHistory')],
+            ['export', t(lang, 'tabLog')],
+            ['settings', t(lang, 'tabSettings')],
           ] as [Tab, string][]
-        ).map(([t, label]) => (
-          <button key={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+        ).map(([tb, label]) => (
+          <button key={tb} className={tab === tb ? 'on' : ''} onClick={() => setTab(tb)}>
             {label}
           </button>
         ))}
