@@ -101,6 +101,21 @@ class SettingsStore {
 export const eventStore = new EventStore()
 export const settingsStore = new SettingsStore()
 
+// One-tap sync setup: a shared link like .../#setup=<base64 {u,k,f}> configures
+// this device and disappears from the URL (never lands in the public repo).
+try {
+  const m = location.hash.match(/#setup=([A-Za-z0-9+/=_-]+)/)
+  if (m) {
+    const cfg = JSON.parse(atob(decodeURIComponent(m[1])))
+    if (cfg.u && cfg.k && cfg.f) {
+      settingsStore.update({ supabaseUrl: cfg.u, supabaseAnonKey: cfg.k, familyCode: cfg.f })
+    }
+    history.replaceState(null, '', location.pathname + location.search)
+  }
+} catch {
+  // malformed setup link — ignore
+}
+
 export function useEvents(): AppEvent[] {
   return useSyncExternalStore(eventStore.subscribe, eventStore.getEvents)
 }

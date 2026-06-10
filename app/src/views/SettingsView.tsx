@@ -28,6 +28,7 @@ export default function SettingsView() {
   const [key, setKey] = useState(settings.supabaseAnonKey)
   const [family, setFamily] = useState(settings.familyCode)
   const [syncStatus, setSyncStatus] = useState<string>(eventStore.sync ? eventStore.sync.status : 'off')
+  const [linkCopied, setLinkCopied] = useState(false)
   useEffect(() => {
     const timer = setInterval(() => setSyncStatus(eventStore.sync ? eventStore.sync.status : 'off'), 1500)
     return () => clearInterval(timer)
@@ -231,6 +232,21 @@ export default function SettingsView() {
         >
           {t(lang, 'saveConnect')}
         </button>
+        {settings.supabaseUrl && settings.supabaseAnonKey && (
+          <button
+            className="btn"
+            onClick={async () => {
+              const cfg = btoa(
+                JSON.stringify({ u: settings.supabaseUrl, k: settings.supabaseAnonKey, f: settings.familyCode }),
+              )
+              await navigator.clipboard.writeText(`${location.origin}${location.pathname}#setup=${cfg}`)
+              setLinkCopied(true)
+              setTimeout(() => setLinkCopied(false), 3000)
+            }}
+          >
+            {linkCopied ? t(lang, 'linkCopied') : t(lang, 'shareSyncLink')}
+          </button>
+        )}
       </div>
 
       <div className="card">
