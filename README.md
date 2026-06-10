@@ -4,6 +4,13 @@ Sleep-training co-pilot for Nolan (6 months, Phase 1). Turns the sleep trainer's
 into a live "what do I do next" dashboard with one-tap logging and an auto-generated daily
 log in the trainer's Excel format. See [SPEC.md](SPEC.md) for the full design.
 
+**Live app: https://heartyguy.github.io/nolan-sleep/**
+
+On each phone: open that link → Share → **Add to Home Screen**. Pick the caregiver chip at
+the top (Mom / Grandpa / Grandma) and the language in Settings (English / 中文).
+
+To redeploy after changes: `./deploy.sh`
+
 ## Run it
 
 ```bash
@@ -14,14 +21,12 @@ npm test           # engine tests (verified against the trainer-confirmed June 9
 npm run build      # production build into app/dist
 ```
 
-## Put it on phones (deploy)
+## Deploy
 
-The build is a static site — any static host works. Easiest path:
-
-1. `npm run build`
-2. Drag `app/dist` into https://app.netlify.com/drop (or use Vercel: `npx vercel app`)
-3. Open the URL on each phone → Share → **Add to Home Screen** (installs as an app, dark
-   theme, full screen)
+Hosted on GitHub Pages from the `gh-pages` branch of
+[heartyguy/nolan-sleep](https://github.com/heartyguy/nolan-sleep).
+`./deploy.sh` rebuilds and force-pushes `app/dist` there; the site updates in ~1 minute
+(the service worker picks new versions up silently on next open).
 
 ## Family sync (mom + grandpa + grandma on the same live day)
 
